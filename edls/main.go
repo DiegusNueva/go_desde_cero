@@ -7,6 +7,7 @@ import (
 	"os"
 	"regexp"
 	"runtime"
+	"sort"
 	"strings"
 	"time"
 )
@@ -17,12 +18,12 @@ const Windows = "windows"
 func main() {
 	// filter patter
 	flagPattern := flag.String("p", "", "filter by pattern")
-	// flagAll := flag.Bool("a", false, "all files including hide files")
+	flagAll := flag.Bool("a", false, "all files including hide files")
 	flagNumberRecords := flag.Int("n", 0, "number of records")
 
 	// order flags
-	// hasOrderByTime := flag.Bool("t", false, "sort by time, oldest first")
-	// hasOrderBySize := flag.Bool("s", false, "sort by file size, smallest first")
+	hasOrderByTime := flag.Bool("t", false, "sort by time, oldest first")
+	hasOrderBySize := flag.Bool("s", false, "sort by file size, smallest first")
 	// hasOrderByReverse := flag.Bool("r", false, "reverse order while sorting")
 
 	flag.Parse()
@@ -41,28 +42,48 @@ func main() {
 	fs := []file{}
 
 	for _, dir := range dirs {
-		f, err := getFile(dir, false)
-		if err != nil {
-			panic(err)
-		}
+		isHidden := isHidden(dir.Name(), path)
 
-		isMatched, err := regexp.MatchString("(?i)"+*flagPattern, f.name)
-
-		if err != nil {
-			panic(err)
-		}
-
-		if !isMatched {
+		if isHidden && !*flagAll {
 			continue
+		}
+
+		if *flagPattern != "" {
+
+			isMatched, err := regexp.MatchString("(?i)"+*flagPattern, dir.Name())
+
+			if err != nil {
+				panic(err)
+			}
+
+			if !isMatched {
+				continue
+			}
+		}
+
+		f, err := getFile(dir, isHidden)
+		if err != nil {
+			panic(err)
 		}
 
 		fs = append(fs, f)
 	}
+
+	if !*hasOrderBySize || !*hasOrderByTime {
+		orderByName(fs)
+	}
+
 	if *flagNumberRecords == 0 || *flagNumberRecords > len(fs) {
 		*flagNumberRecords = len(fs)
 	}
 	printList(fs, *flagNumberRecords)
 
+}
+
+func orderByName(files []file) {
+	sort.SliceStable(files, func(i, j int) bool {
+		return strings.ToLower(files[i].name) < strings.ToLower(files[j].name)
+	})
 }
 
 func printList(fs []file, nRecords int) {
@@ -139,4 +160,10 @@ func isImage(f file) bool {
 	return strings.HasSuffix(f.name, png) ||
 		strings.HasSuffix(f.name, jpg) ||
 		strings.HasSuffix(f.name, gif)
+}
+
+func isHidden(fileName, basePath string) bool {
+
+	return strings.HasPrefix(fileName, ".")
+
 }
