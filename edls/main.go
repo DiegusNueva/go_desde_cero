@@ -5,11 +5,16 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
+	"path"
 	"regexp"
 	"runtime"
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/AJRDRGZ/fileinfo"
+	"github.com/fatih/color"
+	"golang.org/x/exp/constraints"
 )
 
 // Windows os  system
@@ -24,7 +29,7 @@ func main() {
 	// order flags
 	hasOrderByTime := flag.Bool("t", false, "sort by time, oldest first")
 	hasOrderBySize := flag.Bool("s", false, "sort by file size, smallest first")
-	// hasOrderByReverse := flag.Bool("r", false, "reverse order while sorting")
+	hasOrderByReverse := flag.Bool("r", false, "reverse order while sorting")
 
 	flag.Parse()
 	path := flag.Arg(0)
@@ -70,7 +75,15 @@ func main() {
 	}
 
 	if !*hasOrderBySize || !*hasOrderByTime {
-		orderByName(fs)
+		orderByName(fs, *hasOrderByReverse)
+	}
+
+	if *hasOrderBySize && !*hasOrderByTime {
+		orderBySize(fs, *hasOrderByReverse)
+	}
+
+	if *hasOrderByTime {
+		orderByTime(fs, *hasOrderByReverse)
 	}
 
 	if *flagNumberRecords == 0 || *flagNumberRecords > len(fs) {
@@ -80,18 +93,51 @@ func main() {
 
 }
 
-func orderByName(files []file) {
+func mySort[T constraints.Ordered](i, j T, isReverse bool) bool {
+	if isReverse {
+		return i > j
+	}
+
+	return i < j
+}
+
+func orderByTime(files []file, isReverse bool) {
 	sort.SliceStable(files, func(i, j int) bool {
-		return strings.ToLower(files[i].name) < strings.ToLower(files[j].name)
+
+		return mySort(
+			files[i].modificationTime.Unix(),
+			files[j].modificationTime.Unix(),
+			isReverse,
+		)
 	})
+}
+
+func orderByName(files []file, isReverse bool) {
+	sort.SliceStable(files, func(i, j int) bool {
+
+		return mySort(strings.ToLower(files[i].name), strings.ToLower(files[j].name), isReverse)
+
+	})
+}
+
+func orderBySize(files []file, isReverse bool) {
+
+	sort.SliceStable(files, func(i, j int) bool {
+		return mySort(
+			files[i].size,
+			files[j].size,
+			isReverse,
+		)
+	})
+
 }
 
 func printList(fs []file, nRecords int) {
 	for _, file := range fs[:nRecords] {
 		style := mapStyleByFileType[file.fileType]
-		fmt.Printf("%s %s %s %10d %s %s %s%s\n",
+		fmt.Printf("%s %s %s %10d %s %s %s%s %s\n",
 			file.mode, file.userName, file.groupName, file.size, file.modificationTime.Format(time.DateTime),
-			style.icon, file.name, style.symbol)
+			style.icon, setColor(file.name, style.color), style.symbol, markHidden(file.isHidden))
 	}
 }
 
@@ -103,12 +149,14 @@ func getFile(dir fs.DirEntry, isHidden bool) (file, error) {
 		return file{}, fmt.Errorf("dir.Info(): %v", err)
 	}
 
+	userName, groupName := fileinfo.GetUserAndGroup(info.Sys())
+
 	f := file{
 		name:             dir.Name(),
 		isDir:            dir.IsDir(),
 		isHidden:         isHidden,
-		userName:         "cualquiera",
-		groupName:        "EDteam",
+		userName:         userName,
+		groupName:        groupName,
 		size:             info.Size(),
 		modificationTime: info.ModTime(),
 		mode:             info.Mode().String(),
@@ -164,6 +212,37 @@ func isImage(f file) bool {
 
 func isHidden(fileName, basePath string) bool {
 
-	return strings.HasPrefix(fileName, ".")
+	filePath := fileName
 
+	if runtime.GOOS == Windows {
+		filePath = path.Join(basePath, fileName)
+	}
+
+	return fileinfo.IsHidden(filePath)
+
+}
+
+func setColor(nameFile string, styleColor color.Attribute) string {
+	switch styleColor {
+	case color.FgBlue:
+		return blue(nameFile)
+	case color.FgGreen:
+		return green(nameFile)
+	case color.FgRed:
+		return red(nameFile)
+	case color.FgMagenta:
+		return magenta(nameFile)
+	case color.FgCyan:
+		return cyan(nameFile)
+	}
+
+	return nameFile
+}
+
+func markHidden(isHidden bool) string {
+	if !isHidden {
+		return ""
+	}
+
+	return yellow("ø")
 }
