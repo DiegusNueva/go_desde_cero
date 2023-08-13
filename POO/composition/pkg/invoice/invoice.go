@@ -10,12 +10,12 @@ type Invoice struct {
 	country string
 	city    string
 	total   float64
-	client  customer.Customer  // relación de uno a uno
-	items   []invoiceitem.Item // relación de uno a muchos
+	client  customer.Customer // relación de uno a uno
+	items   invoiceitem.Items // relación de uno a muchos
 }
 
 // New returns a new Invoice
-func New(country, city string, client customer.Customer, items []invoiceitem.Item) Invoice {
+func New(country, city string, client customer.Customer, items invoiceitem.Items) Invoice {
 	return Invoice{
 		country: country,
 		city:    city,
@@ -26,7 +26,5 @@ func New(country, city string, client customer.Customer, items []invoiceitem.Ite
 
 // SetTotal is the setter of Invoice.total
 func (i *Invoice) SetTotal() {
-	for _, item := range i.items {
-		i.total += item.Value()
-	}
+	i.total = i.items.Total()
 }

@@ -14,11 +14,11 @@ func main() {
 		"Colombia",
 		"Popayán",
 		customer.New("Alejandro", "cl 123 # 23-4", "658987421"),
-		[]invoiceitem.Item{
+		invoiceitem.NewItems(
 			invoiceitem.New(1, "Curso de Go", 12.34),
-			invoiceitem.New(1, "Curso de POO con Go", 54.23),
-			invoiceitem.New(1, "Curso de testing con Go", 90.00),
-		},
+			invoiceitem.New(2, "Curso de POO con Go", 54.23),
+			invoiceitem.New(3, "Curso de testing con Go", 90.00),
+		),
 	)
 	i.SetTotal()
 	fmt.Printf("%+v\n", i)
